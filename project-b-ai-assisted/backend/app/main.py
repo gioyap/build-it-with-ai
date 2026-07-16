@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from . import __version__
 from .config import get_settings
 from .db import init_db
+from .routes import router
 
 
 @asynccontextmanager
@@ -32,6 +33,8 @@ app = FastAPI(
     version=__version__,
     lifespan=lifespan,
 )
+
+app.include_router(router)
 
 
 @app.get("/health", tags=["meta"], summary="Liveness check")
