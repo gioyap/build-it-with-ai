@@ -6,10 +6,22 @@ Data persistence and the URL/redirect/stats endpoints are added in later phases.
 
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 
 from . import __version__
 from .config import get_settings
+from .db import init_db
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Ensure the database schema exists before the app serves requests."""
+
+    init_db()
+    yield
+
 
 app = FastAPI(
     title="URL Shortener API",
@@ -18,6 +30,7 @@ app = FastAPI(
         "counts. Creating URLs requires an API key; redirects are public."
     ),
     version=__version__,
+    lifespan=lifespan,
 )
 
 
