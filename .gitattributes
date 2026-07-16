@@ -1,0 +1,13 @@
+# Normalize text line endings in the repo, checkout native on each OS
+* text=auto
+
+# Treat these as binary — never apply line-ending conversion
+*.pdf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
