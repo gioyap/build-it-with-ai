@@ -96,6 +96,15 @@ def create_short_url(
             db.commit()
             break
         except sqlite3.IntegrityError:
+            # Create race: a concurrent request may have inserted this exact
+            # URL after our dedup check. Its code is identical (same hash),
+            # so return that row instead of salting into a duplicate entry.
+            holder = db.execute(
+                "SELECT * FROM urls WHERE short_code = ?", (code,)
+            ).fetchone()
+            if holder is not None and holder["long_url"] == long_url:
+                response.status_code = status.HTTP_200_OK
+                return _row_to_response(holder)
             continue
     else:
         raise HTTPException(

@@ -16,6 +16,9 @@ from urllib.parse import urlparse
 
 _BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 
+# Practical ceiling shared by browsers and CDNs; also caps hash input size.
+MAX_URL_LENGTH = 2048
+
 
 def normalize_url(raw: str) -> str:
     """Validate a URL and return its normalized form.
@@ -27,6 +30,8 @@ def normalize_url(raw: str) -> str:
     candidate = raw.strip()
     if not candidate:
         raise ValueError("URL must not be empty")
+    if len(candidate) > MAX_URL_LENGTH:
+        raise ValueError(f"URL must be at most {MAX_URL_LENGTH} characters")
 
     parsed = urlparse(candidate)
     if parsed.scheme not in ("http", "https"):
