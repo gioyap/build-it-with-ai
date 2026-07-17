@@ -107,6 +107,46 @@ def create_short_url(
     return _row_to_response(row)
 
 
+@router.get(
+    "/api/urls",
+    response_model=list[UrlResponse],
+    tags=["urls"],
+    summary="List created short URLs",
+    dependencies=[Depends(require_api_key)],
+)
+def list_urls(db: sqlite3.Connection = Depends(get_db)) -> list[UrlResponse]:
+    """Return every short URL with its click count, newest first.
+
+    Requires X-API-Key — this backs the dashboard, which belongs to the
+    key holder, unlike the public per-code stats endpoint.
+    """
+
+    rows = db.execute("SELECT * FROM urls ORDER BY created_at DESC, id DESC").fetchall()
+    return [_row_to_response(row) for row in rows]
+
+
+@router.get(
+    "/api/urls/{short_code}/stats",
+    response_model=UrlResponse,
+    tags=["urls"],
+    summary="Get stats for a short URL",
+)
+def get_url_stats(
+    short_code: str,
+    db: sqlite3.Connection = Depends(get_db),
+) -> UrlResponse:
+    """Return the click count and metadata for a single short code. Public."""
+
+    row = db.execute(
+        "SELECT * FROM urls WHERE short_code = ?", (short_code,)
+    ).fetchone()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Short URL not found"
+        )
+    return _row_to_response(row)
+
+
 def _is_expired(row: sqlite3.Row) -> bool:
     """True when the row has an expiry timestamp in the past."""
 
