@@ -6,6 +6,7 @@ import sqlite3
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.responses import RedirectResponse
 
 from .auth import require_api_key
 from .config import get_settings
@@ -104,3 +105,55 @@ def create_short_url(
 
     row = db.execute("SELECT * FROM urls WHERE short_code = ?", (code,)).fetchone()
     return _row_to_response(row)
+
+
+def _is_expired(row: sqlite3.Row) -> bool:
+    """True when the row has an expiry timestamp in the past."""
+
+    if row["expires_at"] is None:
+        return False
+    expires = datetime.strptime(row["expires_at"], "%Y-%m-%d %H:%M:%S")
+    return expires <= datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+@router.get(
+    "/{short_code}",
+    tags=["urls"],
+    summary="Redirect to the original URL",
+    response_class=RedirectResponse,
+    status_code=status.HTTP_307_TEMPORARY_REDIRECT,
+)
+def redirect_short_url(
+    short_code: str,
+    db: sqlite3.Connection = Depends(get_db),
+) -> RedirectResponse:
+    """Resolve a short code and redirect to its long URL. Public.
+
+    Uses 307 so clients do not cache the mapping permanently (a 301 would let
+    browsers skip the server — and the click counter — on repeat visits).
+    Returns 404 for unknown codes and 410 for expired ones.
+    """
+
+    row = db.execute(
+        "SELECT * FROM urls WHERE short_code = ?", (short_code,)
+    ).fetchone()
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Short URL not found"
+        )
+    if _is_expired(row):
+        raise HTTPException(
+            status_code=status.HTTP_410_GONE, detail="Short URL has expired"
+        )
+
+    # Single-statement increment is atomic; concurrent redirects never lose
+    # a count the way a read-modify-write would.
+    db.execute(
+        "UPDATE urls SET click_count = click_count + 1 WHERE short_code = ?",
+        (short_code,),
+    )
+    db.commit()
+
+    return RedirectResponse(
+        url=row["long_url"], status_code=status.HTTP_307_TEMPORARY_REDIRECT
+    )

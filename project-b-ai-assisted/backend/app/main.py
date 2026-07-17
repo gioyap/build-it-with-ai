@@ -34,8 +34,6 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.include_router(router)
-
 
 @app.get("/health", tags=["meta"], summary="Liveness check")
 def health() -> dict[str, str]:
@@ -55,3 +53,8 @@ def root() -> dict[str, str]:
         "base_url": settings.base_url,
         "docs": "/docs",
     }
+
+
+# Included last: the router's GET /{short_code} catch-all must not shadow the
+# fixed routes above (/health, /) — matching follows registration order.
+app.include_router(router)
